@@ -5,3 +5,7 @@ class UserRegistration(BaseModel):
    email: EmailStr
    password: str=Field(..., min_length=6,max_length=72)
    college_tier: Optional[int] = None
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str

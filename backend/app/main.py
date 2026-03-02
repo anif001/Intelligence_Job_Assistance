@@ -9,6 +9,9 @@ from app.models.user import User
 from app.schemas.user_schema import UserRegistration
 from app.utils.security import hash_password
 from fastapi import HTTPException, status
+from app.utils.security import verify_password, create_access_token,ACCESS_TOKEN_EXPIRE_MINUTES
+from datetime import timedelta
+from app.schemas.user_schema import UserLogin
 
 app = FastAPI()
 Base.metadata.create_all(bind=engine)
@@ -57,5 +60,16 @@ def register_user(user: UserRegistration, db: SessionLocal = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error creating user")
     return {"message": "User registered successfully", "user_id": new_user.id}
+
+@app.post("/auth/login")
+def login_user(user: UserLogin, db: SessionLocal = Depends(get_db)):
+    db_user = db.query(User).filter(User.email == user.email).first()
+    if not db_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+    if not verify_password(user.password, db_user.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(data={"sub": db_user.email}, expires_delta=access_token_expires)
+    return {"access_token": access_token, "token_type": "bearer"}
 
     
