@@ -16,10 +16,12 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 # hash_password() takes a plain text password and returns a hashed version of it using the bcrypt algorithm.
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
+
 #verify_password() takes a plain text password and a hashed password, and returns True if the plain text password matches the hashed password, 
 # otherwise it returns False.
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
+
 # create_access_token() takes a dictionary of data and an optional expiration time...
 #  and returns a JSON Web Token (JWT) that encodes the data along with the expiration time.
 def create_access_token(data: dict, expires_delta: timedelta = None):
@@ -31,3 +33,15 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
+def decode_access_token(token: str):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise JWTError("Invalid token: missing subject")
+        return email
+    except JWTError as e:
+        raise JWTError(f"Token decoding error: {str(e)}")
+    
+        

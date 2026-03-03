@@ -12,9 +12,28 @@ from fastapi import HTTPException, status
 from app.utils.security import verify_password, create_access_token,ACCESS_TOKEN_EXPIRE_MINUTES
 from datetime import timedelta
 from app.schemas.user_schema import UserLogin
+from app.utils.security import decode_access_token
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from sqlalchemy.exc import IntegrityError
 
 app = FastAPI()
+
 Base.metadata.create_all(bind=engine)
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: SessionLocal = Depends(get_db)):
+    payload = decode_access_token(token)
+    if payload is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication credentials")
+    email = payload.get("sub")
+    if email is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication credentials")
+    user = db.query(User).filter(User.email == email).first()
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    return user
+    
 @app.get("/")
 #depends(get_db) is used to inject the database session into the endpoint function...
 #execute() is used to execute a raw SQL query against the database...
@@ -62,14 +81,18 @@ def register_user(user: UserRegistration, db: SessionLocal = Depends(get_db)):
     return {"message": "User registered successfully", "user_id": new_user.id}
 
 @app.post("/auth/login")
-def login_user(user: UserLogin, db: SessionLocal = Depends(get_db)):
-    db_user = db.query(User).filter(User.email == user.email).first()
-    if not db_user:
+def login_user(form_data: OAuth2PasswordRequestForm = Depends(), db: SessionLocal = Depends(get_db)):
+    user = db.query(User).filter(User.email == form_data.username).first()
+    if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
-    if not verify_password(user.password, db_user.password_hash):
+    if not verify_password(form_data.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(data={"sub": db_user.email}, expires_delta=access_token_expires)
+    access_token = create_access_token(data={"sub": user.email}, expires_delta=access_token_expires)
     return {"access_token": access_token, "token_type": "bearer"}
 
+
+@app.get("/users/me")
+def read_users_me(current_user: User = Depends(get_current_user)):
+    return current_user
     
