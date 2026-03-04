@@ -56,9 +56,7 @@ def register_user(user: UserRegistration, db: SessionLocal = Depends(get_db)):
     existing_user = db.query(User).filter(User.email == user.email).first()
     if existing_user:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
-    if user.password:
-         if len(user.password) < 6 or len(user.password) > 72:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Password must be between 6 and 72 characters")
+        
     if user.college_tier is not None:
         if user.college_tier < 1 or user.college_tier > 3:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="College tier must be between 1 and 3")
